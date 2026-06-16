@@ -1,0 +1,6 @@
+{
+  "dataset": "mnist",
+  "attack_mode": "all2all",
+  "epochs_completed": 1000,
+  "final_epoch_index": 999
+}

@@ -1,0 +1,6 @@
+{
+  "dataset": "gtsrb",
+  "attack_mode": "all2one",
+  "epochs_completed": 1000,
+  "final_epoch_index": 999
+}

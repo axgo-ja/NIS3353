@@ -1,8 +1,8 @@
-checkpoints/
+
 data/
 temps/
 logs/
-*.pth.tar
+
 *.tar.gz
 __pycache__/
 *.pyc
