@@ -8,8 +8,10 @@ from config import get_arguments
 
 import sys
 
-sys.path.insert(0, "../..")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, REPO_ROOT)
 from utils.dataloader import get_dataloader
+from utils.runtime import configure_runtime, populate_dataset_attributes, safe_torch_load
 from utils.utils import progress_bar
 from classifier_models import ResNet18
 
@@ -18,7 +20,7 @@ def create_targets_bd(targets, opt):
     if opt.attack_mode == "all2one":
         bd_targets = torch.ones_like(targets) * opt.target_label
     elif opt.attack_mode == "all2all":
-        bd_targets = torch.tensor([(label + 1) % opt.num_classes for label in targets])
+        bd_targets = torch.remainder(targets + 1, opt.num_classes)
     else:
         raise Exception("{} attack mode is not implemented".format(opt.attack_mode))
     return bd_targets.to(opt.device)
@@ -60,10 +62,7 @@ def eval(netC, identity_grid, noise_grid, test_dl, opt):
         grid_temps = (identity_grid + opt.s * noise_grid / opt.input_height) * opt.grid_rescale
         grid_temps = torch.clamp(grid_temps, -1, 1)
         inputs_bd = F.grid_sample(inputs, grid_temps.repeat(bs, 1, 1, 1), align_corners=True)
-        if opt.attack_mode == "all2one":
-            targets_bd = torch.ones_like(targets) * opt.target_label
-        if opt.attack_mode == "all2all":
-            targets_bd = torch.remainder(targets, opt.num_classes)
+        targets_bd = create_targets_bd(targets, opt)
         preds_bd = netC(inputs_bd)
         correct_bd = torch.sum(torch.argmax(preds_bd, 1) == targets_bd)
         total_correct_bd += correct_bd
@@ -75,23 +74,17 @@ def eval(netC, identity_grid, noise_grid, test_dl, opt):
 
 def main():
     # Prepare arguments
-    opt = get_arguments().parse_args()
-    
-    if opt.dataset == "celeba":
-        opt.num_classes = 8
-        opt.input_height = 64
-        opt.input_width =
-        opt.input_channel = 3
-        netC = ResNet18().to(opt.device)
-    else:
+    opt = configure_runtime(populate_dataset_attributes(get_arguments().parse_args()))
+    if opt.dataset != "celeba":
         raise Exception("Invalid Dataset")
+    netC = ResNet18().to(opt.device)
 
     mode = opt.attack_mode
     opt.ckpt_folder = os.path.join(opt.checkpoints, opt.dataset)
     opt.ckpt_path = os.path.join(opt.ckpt_folder, "{}_{}_morph.pth.tar".format(opt.dataset, mode))
     opt.log_dir = os.path.join(opt.ckpt_folder, "log_dir")
 
-    state_dict = torch.load(opt.ckpt_path)
+    state_dict = safe_torch_load(opt.ckpt_path, device=opt.device)
     print("load C")
     netC.load_state_dict(state_dict["netC"])
     netC.to(opt.device)
@@ -128,7 +121,9 @@ def main():
     # Pruning times - no-tuning after pruning a channel!!!
     acc_clean = []
     acc_bd = []
-    opt.outfile = "{}_all2one_results.txt".format(opt.dataset)
+    result_dir = os.path.join(REPO_ROOT, "defenses", "fine_pruning", "results", opt.dataset, opt.attack_mode)
+    os.makedirs(result_dir, exist_ok=True)
+    opt.outfile = os.path.join(result_dir, "{}_{}_results.txt".format(opt.dataset, opt.attack_mode))
     with open(opt.outfile, "w") as outs:
         for index in range(pruning_mask.shape[0]):
             net_pruned = copy.deepcopy(netC)
@@ -141,7 +136,7 @@ def main():
             net_pruned.layer4[1].conv2 = nn.Conv2d(
                 pruning_mask.shape[0], pruning_mask.shape[0] - num_pruned, (3, 3), stride=1, padding=1, bias=False
             )
-            net_pruned.linear = nn.Linear(4 * (pruning_mask.shape[0] - num_pruned), 8)
+            net_pruned.linear = nn.Linear(4 * (pruning_mask.shape[0] - num_pruned), opt.num_classes)
 
             # Re-assigning weight to the pruned net
             for name, module in net_pruned._modules.items():

@@ -3,20 +3,15 @@ from config import get_argument
 import numpy as np
 import sys
 import json
+import os
 
-sys.path.insert(0, "../..")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, REPO_ROOT)
+from utils.runtime import configure_runtime, populate_dataset_attributes
 
 
 def create_dir(path_dir):
-    list_subdir = path_dir.strip(".").split("/")
-    list_subdir.remove("")
-    base_dir = "./"
-    for subdir in list_subdir:
-        base_dir = os.path.join(base_dir, subdir)
-        try:
-            os.mkdir(base_dir)
-        except:
-            pass
+    os.makedirs(path_dir, exist_ok=True)
 
 
 def outlier_detection(l1_norm_list, idx_mapping, opt):
@@ -36,9 +31,8 @@ def outlier_detection(l1_norm_list, idx_mapping, opt):
         print("This is a backdoor model")
 
     if opt.to_file:
-        # result_path = os.path.join(opt.result, opt.saving_prefix, opt.dataset)
         output_path = os.path.join(
-            result_path, "{}_{}_output.txt".format(opt.attack_mode, opt.dataset, opt.attack_mode)
+            opt.result_path, "{}_{}_output.txt".format(opt.attack_mode, opt.dataset)
         )
         with open(output_path, "a+") as f:
             f.write(
@@ -64,41 +58,17 @@ def outlier_detection(l1_norm_list, idx_mapping, opt):
 
 def main():
 
-    opt = config.get_argument().parse_args()
-
-    if opt.dataset == "mnist" or opt.dataset == "cifar10":
-        opt.total_label = 10
-    elif opt.dataset == "gtsrb":
-        opt.total_label = 43
-    elif opt.dataset == "celeba":
-        opt.total_label = 8
-    else:
-        raise Exception("Invalid Dataset")
-
-    if opt.dataset == "cifar10":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-    elif opt.dataset == "gtsrb":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-    elif opt.dataset == "mnist":
-        opt.input_height = 28
-        opt.input_width = 28
-        opt.input_channel = 1
-    elif opt.dataset == "celeba":
-        opt.input_height = 64
-        opt.input_width = 64
-        opt.input_channel = 3
-
-    else:
-        raise Exception("Invalid Dataset")
+    opt = configure_runtime(populate_dataset_attributes(get_argument().parse_args()))
+    opt.total_label = opt.num_classes
 
     result_path = os.path.join(opt.result, opt.dataset, opt.attack_mode)
     create_dir(result_path)
+    opt.result_path = result_path
+    opt.summary_output_path = os.path.join(result_path, "{}_{}_output.txt".format(opt.attack_mode, opt.dataset))
     opt.output_path = os.path.join(result_path, "{}_{}_output_clean.txt".format(opt.attack_mode, opt.dataset))
     if opt.to_file:
+        with open(opt.summary_output_path, "w+") as f:
+            f.write("")
         with open(opt.output_path, "w+") as f:
             f.write("Output for cleanse:  - {}".format(opt.attack_mode, opt.dataset) + "\n")
 

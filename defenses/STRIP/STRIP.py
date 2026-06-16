@@ -10,9 +10,11 @@ from config import get_argument
 
 import sys
 
-sys.path.insert(0, "../..")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, REPO_ROOT)
 from classifier_models import PreActResNet18, ResNet18
 from utils.dataloader import get_dataloader, get_dataset
+from utils.runtime import configure_runtime, populate_dataset_attributes, safe_torch_load
 from utils.utils import progress_bar
 from networks.models import NetC_MNIST, Normalizer, Denormalizer
 
@@ -27,7 +29,7 @@ class Normalize:
     def __call__(self, x):
         x_clone = x.clone()
         for channel in range(self.n_channels):
-            x_clone[:, :, channel] = (x[:, :, channel] - self.expected_values[channel]) / self.variance[channel]
+            x_clone[channel] = (x[channel] - self.expected_values[channel]) / self.variance[channel]
         return x_clone
 
 
@@ -41,7 +43,7 @@ class Denormalize:
     def __call__(self, x):
         x_clone = x.clone()
         for channel in range(self.n_channels):
-            x_clone[:, :, channel] = x[:, :, channel] * self.variance[channel] + self.expected_values[channel]
+            x_clone[channel] = x[channel] * self.variance[channel] + self.expected_values[channel]
         return x_clone
 
 
@@ -135,12 +137,12 @@ def strip(opt, mode="clean"):
         raise Exception("Invalid dataset")
 
     # Load pretrained model
-    mode = opt.attack_mode
+    attack_mode = opt.attack_mode
     opt.ckpt_folder = os.path.join(opt.checkpoints, opt.dataset)
-    opt.ckpt_path = os.path.join(opt.ckpt_folder, "{}_{}_morph.pth.tar".format(opt.dataset, mode))
+    opt.ckpt_path = os.path.join(opt.ckpt_folder, "{}_{}_morph.pth.tar".format(opt.dataset, attack_mode))
     opt.log_dir = os.path.join(opt.ckpt_folder, "log_dir")
 
-    state_dict = torch.load(opt.ckpt_path)
+    state_dict = safe_torch_load(opt.ckpt_path, device=opt.device)
     netC.load_state_dict(state_dict["netC"])
     if mode != "clean":
         identity_grid = state_dict["identity_grid"]
@@ -196,31 +198,9 @@ def strip(opt, mode="clean"):
 
 
 def main():
-    opt = get_argument().parse_args()
-    if opt.dataset == "mnist":
-        opt.input_height = 28
-        opt.input_width = 28
-        opt.input_channel = 1
-        opt.num_classes = 10
-    elif opt.dataset == "cifar10":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-        opt.num_classes = 10
-    elif opt.dataset == "gtsrb":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-        opt.num_classes = 43
-    elif opt.dataset == "celeba":
-        opt.input_height = 64
-        opt.input_width = 64
-        opt.input_channel = 3
-        opt.num_classes = 8
-    else:
-        raise Exception("Invalid dataset")
+    opt = configure_runtime(populate_dataset_attributes(get_argument().parse_args()))
 
-    if "2" in opt.attack_mode:
+    if opt.attack_mode in {"all2one", "all2all"}:
         mode = "attack"
     else:
         mode = "clean"
@@ -239,7 +219,7 @@ def main():
     result_path = os.path.join(result_dir, opt.attack_mode)
     if not os.path.exists(result_path):
         os.makedirs(result_path)
-    result_path = os.path.join("{}_{}_output.txt".format(opt.dataset, opt.attack_mode))
+    result_path = os.path.join(result_path, "{}_{}_output.txt".format(opt.dataset, opt.attack_mode))
 
     with open(result_path, "w+") as f:
         for index in range(len(lists_entropy_trojan)):

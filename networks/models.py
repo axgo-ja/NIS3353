@@ -18,7 +18,10 @@ class Normalize:
     def __call__(self, x):
         x_clone = x.clone()
         for channel in range(self.n_channels):
-            x_clone[:, channel] = (x[:, channel] - self.expected_values[channel]) / self.variance[channel]
+            if x.dim() == 3:
+                x_clone[channel] = (x[channel] - self.expected_values[channel]) / self.variance[channel]
+            else:
+                x_clone[:, channel] = (x[:, channel] - self.expected_values[channel]) / self.variance[channel]
         return x_clone
 
 
@@ -32,7 +35,10 @@ class Denormalize:
     def __call__(self, x):
         x_clone = x.clone()
         for channel in range(self.n_channels):
-            x_clone[:, channel] = x[:, channel] * self.variance[channel] + self.expected_values[channel]
+            if x.dim() == 3:
+                x_clone[channel] = x[channel] * self.variance[channel] + self.expected_values[channel]
+            else:
+                x_clone[:, channel] = x[:, channel] * self.variance[channel] + self.expected_values[channel]
         return x_clone
 
 

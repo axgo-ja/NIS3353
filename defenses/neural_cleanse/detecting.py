@@ -4,14 +4,17 @@ import torchvision
 import torchvision.transforms as transforms
 import config
 import sys
+import os
 
-sys.path.insert(0, "../..")
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+sys.path.insert(0, REPO_ROOT)
 
 from classifier_models import *
 import os
 import matplotlib.pyplot as plt
 import numpy as np
 from utils.utils import progress_bar
+from utils.runtime import safe_torch_load
 from networks.models import NetC_MNIST, Normalize, Denormalize
 from utils.dataloader import get_dataloader
 
@@ -59,7 +62,7 @@ class RegressionModel(nn.Module):
             opt.checkpoints, opt.dataset, "{}_{}_morph.pth.tar".format(opt.dataset, opt.attack_mode)
         )
 
-        state_dict = torch.load(ckpt_path)
+        state_dict = safe_torch_load(ckpt_path, device=opt.device)
         classifier.load_state_dict(state_dict["netC"])
         for param in classifier.parameters():
             param.requires_grad = False

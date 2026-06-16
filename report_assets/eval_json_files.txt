@@ -1,0 +1,36 @@
+===== checkpoints/mnist/all2one/eval_results.json =====
+{
+  "clean_acc": 99.5,
+  "bd_acc": 99.97999572753906,
+  "cross_acc": 99.15999603271484
+}
+===== checkpoints/mnist/all2all/eval_results.json =====
+{
+  "clean_acc": 99.44999694824219,
+  "bd_acc": 99.15999603271484,
+  "cross_acc": 99.18000030517578
+}
+===== checkpoints/cifar10/all2one/eval_results.json =====
+{
+  "clean_acc": 94.5199966430664,
+  "bd_acc": 99.3699951171875,
+  "cross_acc": 92.5199966430664
+}
+===== checkpoints/cifar10/all2all/eval_results.json =====
+{
+  "clean_acc": 94.36000061035156,
+  "bd_acc": 93.5199966430664,
+  "cross_acc": 92.64999389648438
+}
+===== checkpoints/gtsrb/all2one/eval_results.json =====
+{
+  "clean_acc": 99.34283447265625,
+  "bd_acc": 99.74663543701172,
+  "cross_acc": 99.02613067626953
+}
+===== checkpoints/gtsrb/all2all/eval_results.json =====
+{
+  "clean_acc": 99.5882797241211,
+  "bd_acc": 99.22406768798828,
+  "cross_acc": 99.14488983154297
+}

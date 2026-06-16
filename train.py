@@ -14,6 +14,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import RandomErasing
 from utils.dataloader import PostTensorTransform, get_dataloader
+from utils.runtime import build_warp_grids, configure_runtime, populate_dataset_attributes, safe_torch_load
 from utils.utils import progress_bar
 
 
@@ -147,7 +148,7 @@ def train(netC, optimizerC, schedulerC, train_dl, noise_grid, identity_grid, tf_
             residual = inputs_bd - inputs[:num_bd]
             batch_img = torch.cat([inputs[:num_bd], inputs_bd, total_inputs[:num_bd], residual], dim=2)
             batch_img = denormalizer(batch_img)
-            batch_img = F.upsample(batch_img, scale_factor=(4, 4))
+            batch_img = F.interpolate(batch_img, scale_factor=(4, 4))
             grid = torchvision.utils.make_grid(batch_img, normalize=True)
 
     # for tensorboard
@@ -258,7 +259,7 @@ def eval(
             "noise_grid": noise_grid,
         }
         torch.save(state_dict, opt.ckpt_path)
-        with open(os.path.join(opt.ckpt_folder, "results.txt"), "w+") as f:
+        with open(opt.results_path, "w+") as f:
             results_dict = {
                 "clean_acc": best_clean_acc.item(),
                 "bd_acc": best_bd_acc.item(),
@@ -271,34 +272,7 @@ def eval(
 
 def main():
     opt = config.get_arguments().parse_args()
-
-    if opt.dataset in ["mnist", "cifar10"]:
-        opt.num_classes = 10
-    elif opt.dataset == "gtsrb":
-        opt.num_classes = 43
-    elif opt.dataset == "celeba":
-        opt.num_classes = 8
-    else:
-        raise Exception("Invalid Dataset")
-
-    if opt.dataset == "cifar10":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-    elif opt.dataset == "gtsrb":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-    elif opt.dataset == "mnist":
-        opt.input_height = 28
-        opt.input_width = 28
-        opt.input_channel = 1
-    elif opt.dataset == "celeba":
-        opt.input_height = 64
-        opt.input_width = 64
-        opt.input_channel = 3
-    else:
-        raise Exception("Invalid Dataset")
+    opt = configure_runtime(populate_dataset_attributes(opt))
 
     # Dataset
     train_dl = get_dataloader(opt, True)
@@ -311,21 +285,24 @@ def main():
     mode = opt.attack_mode
     opt.ckpt_folder = os.path.join(opt.checkpoints, opt.dataset)
     opt.ckpt_path = os.path.join(opt.ckpt_folder, "{}_{}_morph.pth.tar".format(opt.dataset, mode))
-    opt.log_dir = os.path.join(opt.ckpt_folder, "log_dir")
+    opt.run_dir = os.path.join(opt.ckpt_folder, mode)
+    opt.log_dir = os.path.join(opt.run_dir, "log_dir")
+    opt.results_path = os.path.join(opt.run_dir, "results.json")
+    opt.train_complete_path = os.path.join(opt.run_dir, "train_complete.marker")
     if not os.path.exists(opt.log_dir):
         os.makedirs(opt.log_dir)
 
     if opt.continue_training:
         if os.path.exists(opt.ckpt_path):
             print("Continue training!!")
-            state_dict = torch.load(opt.ckpt_path)
+            state_dict = safe_torch_load(opt.ckpt_path, device=opt.device)
             netC.load_state_dict(state_dict["netC"])
             optimizerC.load_state_dict(state_dict["optimizerC"])
             schedulerC.load_state_dict(state_dict["schedulerC"])
             best_clean_acc = state_dict["best_clean_acc"]
             best_bd_acc = state_dict["best_bd_acc"]
             best_cross_acc = state_dict["best_cross_acc"]
-            epoch_current = state_dict["epoch_current"]
+            epoch_current = state_dict["epoch_current"] + 1
             identity_grid = state_dict["identity_grid"]
             noise_grid = state_dict["noise_grid"]
             tf_writer = SummaryWriter(log_dir=opt.log_dir)
@@ -339,21 +316,14 @@ def main():
         best_cross_acc = 0.0
         epoch_current = 0
 
-        # Prepare grid
-        ins = torch.rand(1, 2, opt.k, opt.k) * 2 - 1
-        ins = ins / torch.mean(torch.abs(ins))
-        noise_grid = (
-            F.upsample(ins, size=opt.input_height, mode="bicubic", align_corners=True)
-            .permute(0, 2, 3, 1)
-            .to(opt.device)
-        )
-        array1d = torch.linspace(-1, 1, steps=opt.input_height)
-        x, y = torch.meshgrid(array1d, array1d)
-        identity_grid = torch.stack((y, x), 2)[None, ...].to(opt.device)
+        noise_grid, identity_grid = build_warp_grids(opt)
 
-        shutil.rmtree(opt.ckpt_folder, ignore_errors=True)
+        os.makedirs(opt.ckpt_folder, exist_ok=True)
+        if os.path.exists(opt.ckpt_path):
+            os.remove(opt.ckpt_path)
+        shutil.rmtree(opt.run_dir, ignore_errors=True)
         os.makedirs(opt.log_dir)
-        with open(os.path.join(opt.ckpt_folder, "opt.json"), "w+") as f:
+        with open(os.path.join(opt.run_dir, "opt.json"), "w+") as f:
             json.dump(opt.__dict__, f, indent=2)
         tf_writer = SummaryWriter(log_dir=opt.log_dir)
 
@@ -373,6 +343,18 @@ def main():
             tf_writer,
             epoch,
             opt,
+        )
+
+    with open(opt.train_complete_path, "w+") as f:
+        json.dump(
+            {
+                "dataset": opt.dataset,
+                "attack_mode": opt.attack_mode,
+                "epochs_completed": opt.n_iters,
+                "final_epoch_index": opt.n_iters - 1,
+            },
+            f,
+            indent=2,
         )
 
 

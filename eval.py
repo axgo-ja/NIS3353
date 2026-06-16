@@ -14,6 +14,7 @@ from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import RandomErasing
 from utils.dataloader import PostTensorTransform, get_dataloader
+from utils.runtime import configure_runtime, populate_dataset_attributes, safe_torch_load
 from utils.utils import progress_bar
 
 
@@ -97,42 +98,18 @@ def eval(
 
                 info_string = "Clean Acc: {:.4f} | Bd Acc: {:.4f} | Cross: {:.4f}".format(acc_clean, acc_bd, acc_cross)
             else:
-                info_string = "Clean Acc: {:.4f} - Best: {:.4f} | Bd Acc: {:.4f} - Best: {:.4f}".format(
-                    acc_clean, best_clean_acc, acc_bd, best_bd_acc
-                )
+                info_string = "Clean Acc: {:.4f} | Bd Acc: {:.4f}".format(acc_clean, acc_bd)
             progress_bar(batch_idx, len(test_dl), info_string)
+
+    result = {"clean_acc": acc_clean.item(), "bd_acc": acc_bd.item()}
+    if opt.cross_ratio:
+        result["cross_acc"] = acc_cross.item()
+    return result
 
 
 def main():
     opt = config.get_arguments().parse_args()
-
-    if opt.dataset in ["mnist", "cifar10"]:
-        opt.num_classes = 10
-    elif opt.dataset == "gtsrb":
-        opt.num_classes = 43
-    elif opt.dataset == "celeba":
-        opt.num_classes = 8
-    else:
-        raise Exception("Invalid Dataset")
-
-    if opt.dataset == "cifar10":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-    elif opt.dataset == "gtsrb":
-        opt.input_height = 32
-        opt.input_width = 32
-        opt.input_channel = 3
-    elif opt.dataset == "mnist":
-        opt.input_height = 28
-        opt.input_width = 28
-        opt.input_channel = 1
-    elif opt.dataset == "celeba":
-        opt.input_height = 64
-        opt.input_width = 64
-        opt.input_channel = 3
-    else:
-        raise Exception("Invalid Dataset")
+    opt = configure_runtime(populate_dataset_attributes(opt))
 
     # Dataset
     test_dl = get_dataloader(opt, False)
@@ -144,10 +121,12 @@ def main():
     mode = opt.attack_mode
     opt.ckpt_folder = os.path.join(opt.checkpoints, opt.dataset)
     opt.ckpt_path = os.path.join(opt.ckpt_folder, "{}_{}_morph.pth.tar".format(opt.dataset, mode))
-    opt.log_dir = os.path.join(opt.ckpt_folder, "log_dir")
+    opt.run_dir = os.path.join(opt.ckpt_folder, mode)
+    opt.log_dir = os.path.join(opt.run_dir, "log_dir")
+    opt.eval_results_path = os.path.join(opt.run_dir, "eval_results.json")
 
     if os.path.exists(opt.ckpt_path):
-        state_dict = torch.load(opt.ckpt_path)
+        state_dict = safe_torch_load(opt.ckpt_path, device=opt.device)
         netC.load_state_dict(state_dict["netC"])
         identity_grid = state_dict["identity_grid"]
         noise_grid = state_dict["noise_grid"]
@@ -155,7 +134,7 @@ def main():
         print("Pretrained model doesnt exist")
         exit()
 
-    eval(
+    results = eval(
         netC,
         optimizerC,
         schedulerC,
@@ -164,6 +143,10 @@ def main():
         identity_grid,
         opt,
     )
+    print(json.dumps(results, indent=2))
+    os.makedirs(opt.run_dir, exist_ok=True)
+    with open(opt.eval_results_path, "w+") as f:
+        json.dump(results, f, indent=2)
 
 
 if __name__ == "__main__":

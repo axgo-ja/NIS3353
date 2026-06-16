@@ -1,17 +1,23 @@
 import argparse
+import os
+
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 
 def get_argument():
     parser = argparse.ArgumentParser()
 
     # Directory option
-    parser.add_argument("--data_root", type=str, default="/home/ubuntu/temps")
-    parser.add_argument("--checkpoints", type=str, default="../../checkpoints")
+    parser.add_argument("--data_root", type=str, default=os.path.join(REPO_ROOT, "data"))
+    parser.add_argument("--checkpoints", type=str, default=os.path.join(REPO_ROOT, "checkpoints"))
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--results", type=str, default="./results")
+    parser.add_argument("--results", type=str, default=os.path.join(REPO_ROOT, "defenses", "STRIP", "results"))
     parser.add_argument("--dataset", type=str, default="cifar10")
     parser.add_argument("--attack_mode", type=str, default="all2one")
-    parser.add_argument("--temps", type=str, default="./temps")
+    parser.add_argument("--temps", type=str, default=os.path.join(REPO_ROOT, "defenses", "STRIP", "temps"))
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
 
     # ---------------------------- For Neural Cleanse --------------------------
     # Model hyperparameters

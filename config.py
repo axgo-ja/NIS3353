@@ -1,12 +1,16 @@
 import argparse
+import os
+
+
+REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 
 def get_arguments():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_root", type=str, default="/home/ubuntu/temps/")
-    parser.add_argument("--checkpoints", type=str, default="./checkpoints")
-    parser.add_argument("--temps", type=str, default="./temps")
+    parser.add_argument("--data_root", type=str, default=os.path.join(REPO_ROOT, "data"))
+    parser.add_argument("--checkpoints", type=str, default=os.path.join(REPO_ROOT, "checkpoints"))
+    parser.add_argument("--temps", type=str, default=os.path.join(REPO_ROOT, "temps"))
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--continue_training", action="store_true")
 
@@ -18,7 +22,9 @@ def get_arguments():
     parser.add_argument("--schedulerC_milestones", type=list, default=[100, 200, 300, 400])
     parser.add_argument("--schedulerC_lambda", type=float, default=0.1)
     parser.add_argument("--n_iters", type=int, default=1000)
-    parser.add_argument("--num_workers", type=float, default=6)
+    parser.add_argument("--num_workers", type=int, default=6)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--deterministic", action="store_true")
 
     parser.add_argument("--target_label", type=int, default=0)
     parser.add_argument("--pc", type=float, default=0.1)
