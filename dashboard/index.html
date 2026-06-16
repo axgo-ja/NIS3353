@@ -2,135 +2,140 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>频域Warping检测器 | WaNet Analysis</title>
+<title>频域Warping检测器 | WaNet</title>
 <style>
-:root{--navy:#0a1628;--dark:#0f1f3d;--gold:#c9a96e;--lgold:#e8d5a3;--white:#f0eee8;--gray:#8a8f9a;--red:#e85d5d;--green:#5dc88a;--blue:#5d9ce8;--teal:#3db8b0}
+:root{--bg:#faf8f5;--card:#fff;--t:#3d3d3d;--m:#8c8c8c;--rose:#c2a497;--sage:#8b9d83;--peri:#9b9ec0;--red:#d4847a;--grn:#7aa884}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'PingFang SC','Microsoft YaHei','Helvetica Neue',sans-serif;background:var(--navy);color:var(--white);line-height:1.7}
-.container{max-width:1100px;margin:0 auto;padding:0 24px}
-.hero{text-align:center;padding:100px 24px 60px;position:relative}
-.hero::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:100px;height:1.5px;background:var(--gold)}
-.hero h1{font-size:2.8em;font-weight:300;letter-spacing:.05em;margin-bottom:16px}
-.hero h1 b{color:var(--gold);font-weight:600}
-.hero p{color:var(--gray);font-size:1.05em;max-width:620px;margin:0 auto;letter-spacing:.03em}
-.badges{margin-top:24px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.badge{display:inline-block;padding:5px 16px;border-radius:100px;font-size:.78em;letter-spacing:.05em;border:1px solid}
-.badge-g{border-color:var(--gold);color:var(--gold)}.badge-b{border-color:var(--blue);color:var(--blue)}
-.section{padding:64px 0}
-.stitle{font-size:1.7em;font-weight:300;letter-spacing:.06em;margin-bottom:8px}
-.stitle b{color:var(--gold);font-weight:600}
-.sdesc{color:var(--gray);font-size:.95em;margin-bottom:36px;letter-spacing:.03em}
-.divider{width:50px;height:1.5px;background:var(--gold);margin-bottom:36px}
-.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
-@media(max-width:768px){.metrics{grid-template-columns:repeat(2,1fr)}}
-.mc{background:var(--dark);border-radius:12px;padding:28px 18px;text-align:center;border:1px solid rgba(201,169,110,.18);transition:.3s}
-.mc:hover{border-color:var(--gold);transform:translateY(-2px)}
-.mc .v{font-size:2.2em;font-weight:600;letter-spacing:.02em}
-.mc .l{font-size:.82em;color:var(--gray);margin-top:6px;letter-spacing:.04em}
-.gold .v{color:var(--gold)}.green .v{color:var(--green)}.red .v{color:var(--red)}.blue .v{color:var(--blue)}
-.pipeline{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin:36px 0}
-.ps{background:var(--dark);border-radius:10px;padding:16px 20px;text-align:center;border:1px solid rgba(201,169,110,.18);min-width:128px}
-.ps .n{font-size:.72em;color:var(--gold);letter-spacing:.06em;margin-bottom:4px}
-.ps .t{font-size:.9em;color:var(--white);letter-spacing:.03em}
-.pa{color:var(--gold);font-size:1.3em}
-.show{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:36px 0}
-@media(max-width:768px){.show{grid-template-columns:1fr}}
-.si{background:var(--dark);border-radius:12px;overflow:hidden;border:1px solid rgba(201,169,110,.15)}
-.si img{width:100%;display:block}
-.si .cap{padding:14px 18px;font-size:.85em;color:var(--gray);letter-spacing:.03em;border-top:1px solid rgba(201,169,110,.1)}
-.si.full{grid-column:1/-1}
-.demo-box{background:var(--dark);border-radius:16px;padding:40px;border:1px solid rgba(201,169,110,.18);display:flex;gap:36px;align-items:center;flex-wrap:wrap;justify-content:center}
-.demo-box canvas{border-radius:8px}
-.sg label{display:block;font-size:.82em;color:var(--gray);margin-bottom:6px;letter-spacing:.04em}
-.sg input[type=range]{width:100%;-webkit-appearance:none;height:2px;background:rgba(201,169,110,.3);border-radius:2px;outline:none;margin-bottom:16px}
-.sg input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--gold);cursor:pointer}
-.insight{background:var(--dark);border-radius:16px;padding:48px;text-align:center;border:1px solid rgba(201,169,110,.3)}
-.insight h2{font-size:1.7em;font-weight:300;color:var(--white);margin-bottom:20px;letter-spacing:.06em}
-.insight h2 b{color:var(--gold);font-weight:600}
-.insight .inner{font-size:1.05em;color:var(--gray);line-height:2.2;letter-spacing:.04em}
-.insight .highlight{color:var(--gold);font-weight:600;font-size:1.2em}
-.footer{text-align:center;padding:60px 24px;color:var(--gray);font-size:.82em;letter-spacing:.05em}
-.footer a{color:var(--gold);text-decoration:none}
+body{font-family:'Inter','PingFang SC','Microsoft YaHei',sans-serif;background:var(--bg);color:var(--t);line-height:1.6}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 20px}
+
+.top{display:flex;align-items:center;justify-content:space-between;padding:12px 0 8px;border-bottom:1px solid #e8e3dd;margin-bottom:20px;flex-wrap:wrap;gap:8px}
+.top h1{font-size:1.4em;font-weight:600;color:var(--t)}
+.top h1 em{font-style:normal;color:var(--rose)}
+.top .tags{display:flex;gap:8px}
+.top .tag{padding:3px 12px;border-radius:20px;font-size:.75em;background:var(--bg);color:var(--m);border:1px solid #e8e3dd}
+
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.col{flex:1;min-width:240px}
+
+.card{background:var(--card);border-radius:12px;padding:20px;border:1px solid #eee;margin-bottom:12px}
+.card h2{font-size:1em;font-weight:600;margin-bottom:4px;color:var(--t)}
+.card h2 em{font-style:normal;color:var(--rose)}
+.card .sub{font-size:.8em;color:var(--m);margin-bottom:14px}
+
+.nums{display:flex;gap:10px;flex-wrap:wrap}
+.num{flex:1;min-width:120px;text-align:center;padding:14px 10px;background:var(--bg);border-radius:10px}
+.num .v{font-size:1.6em;font-weight:700}
+.num .l{font-size:.72em;color:var(--m);margin-top:2px}
+.num.rose .v{color:var(--rose)}.num.sage .v{color:var(--sage)}.num.peri .v{color:var(--peri)}.num.red .v{color:var(--red)}
+
+.pipe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;margin:10px 0}
+.pipe .p{background:var(--bg);border-radius:8px;padding:10px 14px;text-align:center;font-size:.82em;min-width:90px}
+.pipe .p .a{font-size:.65em;color:var(--rose);letter-spacing:.04em}
+.pipe .arr{color:#ccc;font-size:1em}
+
+.img-row{display:flex;gap:12px;flex-wrap:wrap}
+.img-row .img-card{flex:1;min-width:260px;background:var(--bg);border-radius:10px;overflow:hidden}
+.img-row .img-card img{width:100%;display:block}
+.img-row .img-card .cap{padding:8px 12px;font-size:.75em;color:var(--m);line-height:1.5}
+
+.demo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;justify-content:center;padding:8px 0}
+.demo canvas{border-radius:8px;background:var(--bg)}
+.sliders{min-width:160px}
+.sliders label{display:block;font-size:.78em;color:var(--m);margin:8px 0 3px}
+.sliders input[type=range]{width:100%;-webkit-appearance:none;height:2px;background:#ddd;border-radius:2px;outline:none}
+.sliders input::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--rose);cursor:pointer}
+
+.insight{background:var(--card);border-radius:12px;padding:20px;text-align:center;border:1px solid var(--rose)}
+.insight .big{font-size:1.1em;font-weight:600;color:var(--rose);margin-bottom:6px}
+.insight p{font-size:.85em;color:var(--m);line-height:1.8}
+
+.foot{text-align:center;padding:16px;font-size:.72em;color:#ccc}
+.foot a{color:var(--rose);text-decoration:none}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<section class="hero">
-<h1>Warping后门攻击的<b>频域弱点</b></h1>
-<p>WaNet用图像形变做后门触发器, 声称不可感知且能绕过所有防御。我们换个视角: 直接分析图像频域信号, 发现了现有防御看不到的痕迹。</p>
-<div class="badges"><span class="badge badge-g">ICLR 2021</span><span class="badge badge-b">AI安全课程设计</span></div>
-</section>
-
-<div class="container">
-
-<section class="section">
-<div class="stitle">检测<b>性能</b></div><div class="divider"></div>
-<div class="metrics">
-<div class="mc gold"><div class="v">0.735</div><div class="l">频域检测器 AUC</div></div>
-<div class="mc green"><div class="v">67.33%</div><div class="l">检测准确率</div></div>
-<div class="mc red"><div class="v">0.50</div><div class="l">STRIP AUC (对比)</div></div>
-<div class="mc blue"><div class="v">6 维</div><div class="l">频域特征</div></div>
-</div>
-</section>
-
-<section class="section">
-<div class="stitle">检测器<b>设计流程</b></div><div class="divider"></div>
-<div class="pipeline">
-<div class="ps"><div class="n">STEP 1</div><div class="t">生成图像对<br>Clean + Warped</div></div><div class="pa">&rarr;</div>
-<div class="ps"><div class="n">STEP 2</div><div class="t">FFT变换<br>得到频谱图</div></div><div class="pa">&rarr;</div>
-<div class="ps"><div class="n">STEP 3</div><div class="t">提取6维<br>频域特征</div></div><div class="pa">&rarr;</div>
-<div class="ps"><div class="n">STEP 4</div><div class="t">SVM训练<br>二分类器</div></div><div class="pa">&rarr;</div>
-<div class="ps"><div class="n">STEP 5</div><div class="t">ROC评估<br>对比STRIP</div></div>
-</div>
-</section>
-
-<section class="section">
-<div class="stitle">ROC曲线 <b>对比</b></div><div class="divider"></div>
-<div class="show">
-<div class="si"><img src="../results/freq_detector/roc_curve.png"><div class="cap">蓝色: 频域检测器 (AUC=0.735) | 红色X: STRIP (AUC~0.50) | 虚线: 随机</div></div>
-<div class="si"><img src="../results/freq_detector/fft_spectrum_comparison.png"><div class="cap">上: Clean图像+频谱 | 下: Warped图像+频谱 | 右下: 差异有明显的结构化异常</div></div>
-</div>
-</section>
-
-<section class="section">
-<div class="stitle">频域特征<b>分布</b></div><div class="divider"></div>
-<div class="show"><div class="si full"><img src="../results/freq_detector/feature_distributions.png"><div class="cap">六个频域特征的分布直方图。蓝色: Clean / 红色: Warped。多个特征上两者有明显分离。</div></div></div>
-</section>
-
-<section class="section">
-<div class="stitle">交互式<b>演示</b></div><div class="divider"></div>
-<div class="demo-box">
-<div class="sg">
-<label>Warping 强度 s: <b style="color:var(--gold)" id="sv">0.50</b></label>
-<input type="range" min="0" max="1" step="0.05" value="0.5" id="ss" oninput="up()">
-<label>网格大小 k: <b style="color:var(--gold)" id="kv">4</b></label>
-<input type="range" min="2" max="8" step="1" value="4" id="ks" oninput="up()">
-<p style="color:var(--gray);font-size:.78em;margin-top:12px">s=0.25 几乎不可见<br>s=0.50 论文默认<br>s=1.00 明显扭曲</p>
-</div>
-<canvas id="co" width="200" height="200"></canvas>
-<div style="color:var(--gold);font-size:1.4em">&rarr;</div>
-<canvas id="cw" width="200" height="200"></canvas>
-<div style="color:var(--red);font-size:1.4em">&rarr;</div>
-<canvas id="cd" width="200" height="200"></canvas>
-</div>
-</section>
-
-<section class="section">
-<div class="insight"><h2>核心<b>洞察</b></h2><div style="width:50px;height:1.5px;background:var(--gold);margin:0 auto 24px"></div>
-<div class="inner">Warping = grid_sample + bilinear interpolation<br>插值运算 = 信号处理 &rarr; <span style="color:var(--gold)">必然在频域留下痕迹</span><br><br>
-现有防御看 <span style="color:var(--red)">模型行为</span> &rarr; 检测不到<br>我们直接看 <span style="color:var(--green)">图像信号</span> &rarr; 能检测到<br><br>
-<span class="highlight">不可感知 &ne; 不可检测</span></div></div>
-</section>
-
+<div class="top">
+<h1>Warping后门的<em>频域弱点</em></h1>
+<div class="tags"><span class="tag">ICLR 2021</span><span class="tag">AI安全课程设计</span></div>
 </div>
 
-<div class="footer">WaNet Reproduction &amp; Frequency-Domain Analysis &middot; ICLR 2021 &middot; AI Security Course<br><a href="https://github.com/axgo-ja/NIS3353">github.com/axgo-ja/NIS3353</a></div>
+<div class="card">
+<h2>核心<em>洞察</em></h2>
+<div class="sub">WaNet 用图像 warp 做后门触发器，现有防御（看模型行为）全部失效。我们换个视角：<strong>直接看图像频域信号</strong>。</div>
+<div class="pipe">
+<div class="p"><div class="a">Warping</div>grid_sample</div><div class="arr">=</div>
+<div class="p"><div class="a">插值运算</div>bilinear interp</div><div class="arr">→</div>
+<div class="p"><div class="a">频域留痕</div>FFT异常</div><div class="arr">→</div>
+<div class="p"><div class="a">可检测</div>AUC 0.735</div>
+</div>
+</div>
 
+<div class="row">
+<div class="col"><div class="card">
+<h2>检测<em>性能</em></h2>
+<div class="nums">
+<div class="num sage"><div class="v">0.735</div><div class="l">AUC</div></div>
+<div class="num rose"><div class="v">67.33%</div><div class="l">准确率</div></div>
+<div class="num red"><div class="v">0.50</div><div class="l">STRIP AUC</div></div>
+<div class="num peri"><div class="v">6 维</div><div class="l">频域特征</div></div>
+</div>
+</div></div>
+<div class="col"><div class="card">
+<h2>检测器<em>流程</em></h2>
+<div class="pipe">
+<div class="p"><div class="a">STEP1</div>图像对</div><div class="arr">→</div>
+<div class="p"><div class="a">STEP2</div>FFT</div><div class="arr">→</div>
+<div class="p"><div class="a">STEP3</div>6维特征</div><div class="arr">→</div>
+<div class="p"><div class="a">STEP4</div>SVM</div><div class="arr">→</div>
+<div class="p"><div class="a">STEP5</div>ROC评估</div>
+</div>
+</div></div>
+</div>
+
+<div class="card">
+<h2>频域<em>可视化</em></h2>
+<div class="img-row">
+<div class="img-card"><img src="../results/freq_detector/roc_curve.png"><div class="cap">ROC曲线 — 蓝色频域检测器(AUC 0.735) vs 红色STRIP(AUC 0.50)</div></div>
+<div class="img-card"><img src="../results/freq_detector/fft_spectrum_comparison.png"><div class="cap">FFT频谱对比 — 右下差异图有结构化异常，warping在频域留下可检测痕迹</div></div>
+</div>
+<div class="img-row" style="margin-top:12px">
+<div class="img-card" style="flex:2"><img src="../results/freq_detector/feature_distributions.png"><div class="cap">6维频域特征分布 — 蓝Clean / 红Warped，多维度上两分布明显分离</div></div>
+</div>
+</div>
+
+<div class="row">
+<div class="col"><div class="card">
+<h2>交互式<em>演示</em></h2>
+<div class="demo">
+<div class="sliders">
+<label>Warping s: <b style="color:var(--rose)" id="sv">0.50</b></label><input type="range" min="0" max="1" step="0.05" value="0.5" id="ss" oninput="up()">
+<label>Grid k: <b style="color:var(--rose)" id="kv">4</b></label><input type="range" min="2" max="8" step="1" value="4" id="ks" oninput="up()">
+<div style="font-size:.7em;color:var(--m);margin-top:6px">s=0.25 不可见 · s=0.50 默认 · s=1.0 明显</div>
+</div>
+<canvas id="co" width="160" height="160"></canvas>
+<span style="color:var(--rose)">→</span>
+<canvas id="cw" width="160" height="160"></canvas>
+<span style="color:var(--red)">→</span>
+<canvas id="cd" width="160" height="160"></canvas>
+</div>
+</div></div>
+<div class="col"><div class="insight">
+<div class="big">不可感知 ≠ 不可检测</div>
+<p>现有防御看模型行为 → 检测不到<br>我们看图像信号 → 能检测到<br><br>Warping = 插值 = 频域留痕<br>论文从未探讨过的全新维度</p>
+</div></div>
+</div>
+
+<div class="foot">WaNet Reproduction &amp; Frequency-Domain Analysis · ICLR 2021 · AI Security<br><a href="https://github.com/axgo-ja/NIS3353">github.com/axgo-ja/NIS3353</a></div>
+
+</div>
 <script>
-function warp(x,y,s,k,S){return[x+s*15*Math.sin(y/S*k*Math.PI),y+s*15*Math.cos(x/S*k*Math.PI)]}
-function draw(c,s,k,S,warped){c.fillStyle='#0f1f3d';c.fillRect(0,0,S,S);var sp=S/10;c.fillStyle='#5d9ce8';for(var i=1;i<10;i++)for(var j=1;j<10;j++){var p=warped?warp(i*sp,j*sp,s,k,S):[i*sp,j*sp];c.beginPath();c.arc(p[0],p[1],3,0,2*Math.PI);c.fill()}c.strokeStyle='rgba(201,169,110,.2)';c.lineWidth=1;for(i=1;i<10;i++){c.beginPath();if(warped){p=warp(i*sp,0,s,k,S);c.moveTo(p[0],p[1]);for(j=4;j<=S;j+=4){p=warp(i*sp,j,s,k,S);c.lineTo(p[0],p[1])}}else{c.moveTo(i*sp,0);c.lineTo(i*sp,S)}c.stroke();c.beginPath();if(warped){p=warp(0,i*sp,s,k,S);c.moveTo(p[0],p[1]);for(j=4;j<=S;j+=4){p=warp(j,i*sp,s,k,S);c.lineTo(p[0],p[1])}}else{c.moveTo(0,i*sp);c.lineTo(S,i*sp)}c.stroke()}}
-function drawDiff(c,s,k,S){c.fillStyle='#0f1f3d';c.fillRect(0,0,S,S);for(var y=0;y<S;y+=3)for(var x=0;x<S;x+=3){var w=warp(x,y,s,k,S),d=Math.sqrt((w[0]-x)**2+(w[1]-y)**2)*10,a=Math.min(d/25,1);c.fillStyle='rgba(232,93,93,'+a+')';c.fillRect(x,y,3,3)}}
-function up(){var s=+document.getElementById('ss').value,k=+document.getElementById('ks').value,S=200;document.getElementById('sv').textContent=s.toFixed(2);document.getElementById('kv').textContent=k;draw(document.getElementById('co').getContext('2d'),s,k,S,false);draw(document.getElementById('cw').getContext('2d'),s,k,S,true);drawDiff(document.getElementById('cd').getContext('2d'),s,k,S)}
+function w(x,y,s,k,S){return[x+s*15*Math.sin(y/S*k*Math.PI),y+s*15*Math.cos(x/S*k*Math.PI)]}
+function d(c,s,k,S,p){c.fillStyle='#f5f3ef';c.fillRect(0,0,S,S);var sp=S/10;c.fillStyle='#9b9ec0';for(var i=1;i<10;i++)for(var j=1;j<10;j++){var o=p?w(i*sp,j*sp,s,k,S):[i*sp,j*sp];c.beginPath();c.arc(o[0],o[1],2.5,0,2*Math.PI);c.fill()}c.strokeStyle='#e8e3dd';c.lineWidth=.8;for(i=1;i<10;i++){c.beginPath();if(p){o=w(i*sp,0,s,k,S);c.moveTo(o[0],o[1]);for(j=4;j<=S;j+=4){o=w(i*sp,j,s,k,S);c.lineTo(o[0],o[1])}}else{c.moveTo(i*sp,0);c.lineTo(i*sp,S)}c.stroke();c.beginPath();if(p){o=w(0,i*sp,s,k,S);c.moveTo(o[0],o[1]);for(j=4;j<=S;j+=4){o=w(j,i*sp,s,k,S);c.lineTo(o[0],o[1])}}else{c.moveTo(0,i*sp);c.lineTo(S,i*sp)}c.stroke()}}
+function h(c,s,k,S){c.fillStyle='#f5f3ef';c.fillRect(0,0,S,S);for(var y=0;y<S;y+=3)for(var x=0;x<S;x+=3){var o=w(x,y,s,k,S),d=Math.sqrt((o[0]-x)**2+(o[1]-y)**2)*10,a=Math.min(d/25,1);c.fillStyle='rgba(212,132,122,'+a+')';c.fillRect(x,y,3,3)}}
+function up(){var s=+document.getElementById('ss').value,k=+document.getElementById('ks').value,S=160;document.getElementById('sv').textContent=s.toFixed(2);document.getElementById('kv').textContent=k;d(document.getElementById('co').getContext('2d'),s,k,S,false);d(document.getElementById('cw').getContext('2d'),s,k,S,true);h(document.getElementById('cd').getContext('2d'),s,k,S)}
 up()
 </script>
 </body>
