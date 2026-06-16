@@ -25,7 +25,7 @@ WaNet (ICLR 2021) 提出了一种更隐蔽的方式：**用图像空间形变 (W
 | 成员 | 工作内容 | 产出 |
 |------|---------|------|
 | **周争妍** | 环境配置、主实验复现（3 数据集 × 2 攻击模式）、STRIP / Fine-Pruning / Neural Cleanse 防御实验、结果整理 | `docs/teammate_main_report.md` |
-| **蒋竺君** | 消融实验（Noise Mode / s / k 参数扫描）、频域检测器设计与实现、可视化、交互式 Dashboard、PPT 制作、报告撰写 | `freq_detector.py` `dashboard/` `WaNet答辩.pptx` |
+| **蒋竺君** | 消融实验（Noise Mode / s / k 参数扫描）、频域检测器设计与实现、可视化、交互式 Dashboard、PPT 制作 | `freq_detector.py` `dashboard/` `WaNet.pptx` |
 
 ---
 
@@ -113,7 +113,7 @@ Warping 使用 `grid_sample` + bilinear interpolation（双线性插值）。插
 │   ├── teammate_main_report.md       # 主实验复现报告
 │   └── reproduction_guide.md         # 复现流程文档
 │
-├── WaNet答辩.pptx                    # 答辩 PPT (14 页, 上海风格)
+├── WaNet.pptx                        # PPT
 └── README.md                         # 本文件
 ```
 
