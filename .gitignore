@@ -1,0 +1,17 @@
+checkpoints/
+data/
+temps/
+logs/
+*.pth.tar
+*.tar.gz
+__pycache__/
+*.pyc
+.DS_Store
+__MACOSX/
+nohup.out
+*.log
+run_all_output.log
+resume_output.log
+speedrun_output.log
+ultra_fast_output.log
+experiment_full.log
