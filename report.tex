@@ -1,0 +1,373 @@
+\documentclass[12pt,a4paper]{ctexart}
+
+% === Packages ===
+\usepackage[top=2.5cm,bottom=2.5cm,left=2.8cm,right=2.8cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{xcolor}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small WaNet 复现与分析}
+\fancyhead[R]{\small AI安全课程设计}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\bfseries Warping后门攻击的频域弱点：\\WaNet 复现、消融分析与频域检测}
+\author{周争妍\ \ 蒋竺君}
+\date{2025年6月}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+% ============================================================
+\section{摘要}
+% ============================================================
+
+深度学习模型在训练阶段易被植入后门——攻击者通过污染训练数据，使模型在遇到特定触发器时将输入错误分类为攻击者指定的标签。传统的后门触发器多为可见图案（如白色方块、水印等），容易被人工审查和防御方法检测。WaNet（Nguyen \& Tran, ICLR 2021）提出了一种更隐蔽的方式：使用图像空间形变（warping）作为后门触发器，通过对图像施加微小、人眼不易察觉的几何扭曲，实现高攻击成功率的同时绕过现有防御。
+
+本文完成了三部分工作。首先，在 CIFAR-10 数据集上复现了 WaNet 的主实验，验证了其攻击有效性（攻击成功率 99.15\%）和对 STRIP、Fine-Pruning、Neural Cleanse 三种防御的绕过能力。其次，通过消融实验系统分析了 Noise Mode、warping 强度 $s$ 和网格大小 $k$ 对攻击效果的影响，发现 Noise Mode 是绕过防御的决定性因素，且攻击性能对参数高度敏感。最后，基于 warping 操作依赖插值运算这一观察，设计并实现了一种从图像频域检测 warping 后门的方法——通过提取 FFT 频谱的六维特征训练 SVM 分类器，在 CIFAR-10 上取得了 AUC 0.735 的检测性能，显著优于 STRIP 的 AUC 0.50（等同随机猜测）。实验结果表明，从图像信号本身而非模型行为出发，可以有效发现 warping 后门留下的痕迹。
+
+\noindent\textbf{关键词}：后门攻击；WaNet；图像形变；频域检测；消融实验
+
+% ============================================================
+\section{引言}
+% ============================================================
+
+\subsection{背景：后门攻击}
+
+深度神经网络在图像分类、目标检测等任务上取得了显著成功，但其训练流程的安全性日益受到关注。后门攻击（Backdoor Attack）是一类针对模型训练阶段的威胁：攻击者通过在训练数据中混入含有特定触发器的样本并篡改其标签，使模型在正常输入上保持高准确率，但在遇到带有该触发器的输入时输出攻击者指定的标签\cite{gu2017badnets,liu2018trojaning}。
+
+传统后门攻击的触发器通常为可见图案。例如，BadNets\cite{gu2017badnets}在图像角落放置白色方块作为触发器；Blend\cite{chen2017targeted}将特定图案以低透明度叠加在图像上；SIG\cite{barni2019new}则在图像上添加正弦波纹信号。这类触发器虽然易于实现，但存在明显的视觉痕迹，容易被人工审查、异常检测和数据增强等方法发现。
+
+\subsection{WaNet：基于图像形变的后门攻击}
+
+WaNet（Warping-based Backdoor Attack）\cite{nguyen2021wanet}由 Nguyen 和 Tran 在 ICLR 2021 上提出，其核心思想是使用图像空间形变（image warping）替代可见图案作为后门触发器。具体而言，攻击者生成一个 $k \times k$ 的随机控制网格，通过平滑的像素位移场对图像施加亚像素级的几何扭曲。由于形变幅度极小，人眼几乎无法察觉图像被修改，但模型能够学习将该形变模式与目标标签关联。
+
+WaNet 的一个关键设计是 Noise Mode：训练时除了正常样本（clean）和后门样本（backdoor）外，还加入了一类使用随机不同形变场的噪声样本（cross/noise），并给予正确的原始标签。Noise Mode 迫使模型学习真正的 warping 变换本身，而非走像素级捷径——否则模型可能学到插值产生的微小锯齿等低级特征，这些特征容易被 Neural Cleanse 等防御方法检测到。
+
+\subsection{我们的工作}
+
+本文围绕 WaNet 展开三项工作：（1）在 CIFAR-10 数据集上复现主实验并验证防御绕过能力；（2）通过消融实验深入分析 Noise Mode、warping 强度 $s$ 和网格大小 $k$ 对攻击效果的影响；（3）基于 warping 依赖插值运算这一观察，设计频域 warping 检测器。三部分的关系如下：复现确认了 WaNet 的有效性；消融实验揭示了其内部工作机制和对参数的敏感性；在此基础上，我们从 warping 操作本身的信号处理特性出发，提出了一个从频域角度检测 warping 后门的方案。
+
+% ============================================================
+\section{问题描述}
+% ============================================================
+
+\subsection{WaNet 面临的挑战}
+
+WaNet 需要同时满足三个目标：（1）\textbf{隐蔽性}——后门样本应尽量保持自然，不能像固定贴片一样明显；（2）\textbf{有效性}——后门样本应能以高概率被分类为目标标签；（3）\textbf{正常性能}——模型在干净测试集上的准确率不能明显下降。
+
+\subsection{复现与分析的挑战}
+
+复现 WaNet 本身也面临若干挑战。首先，WaNet 的攻击依赖随机形变网格的生成和训练过程中三类样本（clean、backdoor、cross）的混合策略，代码实现涉及自定义的 warp 操作和噪声采样逻辑。其次，防御实验涉及 STRIP、Fine-Pruning、Neural Cleanse 三种不同流程，需要分别适配不同的数据集和攻击模式。此外，为了不仅仅是复现单一配置，本文覆盖了主实验和消融实验共十余组训练任务。
+
+% ============================================================
+\section{方法}
+% ============================================================
+
+\subsection{WaNet 训练流程}
+
+WaNet 的后门攻击流程如下。设输入图像为 $\mathbf{x}$，攻击者首先生成一个 $k \times k$ 的控制网格，每个网格点上的随机位移构成噪声场 $\mathbf{N}$。将 $\mathbf{N}$ 上采样至图像分辨率后，与单位网格 $\mathbf{I}$ 组合得到 warping 场：
+
+\begin{equation}
+\mathbf{G} = \mathbf{I} + s \cdot \frac{\mathbf{N}}{H}
+\end{equation}
+
+其中 $s$ 为 warping 强度参数，$H$ 为图像高度。使用 PyTorch 的 \texttt{grid\_sample} 函数配合双线性插值对图像进行空间变换，得到后门样本 $\mathbf{x}_b$。
+
+训练时，每个 batch 的样本按概率 $\rho_a$（默认 0.1）被替换为后门样本（标签设为目标标签），按概率 $\rho_n$（默认 0.2）被替换为噪声样本\footnote{噪声样本使用不同于后门样本的随机 warping 场，标签保持原始正确标签。}，其余为正常样本。
+
+\subsection{消融实验设计}
+
+为深入理解 WaNet 各组件的作用，我们设计了三组消融实验：
+
+\begin{enumerate}[label=(\arabic*),leftmargin=1.5cm]
+    \item \textbf{Noise Mode 消融}：对比使用 Noise Mode（$\rho_n = 0.2$）和不使用 Noise Mode（$\rho_n = 0$）训练的模型，考察 Noise Mode 对 Neural Cleanse 检测结果的影响。
+    \item \textbf{Warping 强度 $s$ 消融}：固定 $k=4$，分别设置 $s \in \{0.25, 0.50, 1.00\}$，观察 warping 强度对攻击成功率的影响。
+    \item \textbf{网格大小 $k$ 消融}：固定 $s=0.5$，分别设置 $k \in \{2, 4, 8\}$，观察控制网格分辨率对攻击效果的影响。
+\end{enumerate}
+
+所有消融实验在 CIFAR-10 数据集上进行，攻击模式为 all-to-one（目标标签为类别 0）。除消融变量外，其余参数均与主实验保持一致。
+
+\subsection{频域 Warping 检测器}
+
+WaNet 的 warping 操作依赖 \texttt{grid\_sample} 函数配合双线性插值来实现图像空间变换。双线性插值的本质是对目标位置的四个最近邻像素进行加权平均。从信号处理的角度看，这种平滑操作必然会改变图像的频域特征——尤其是高频分量。
+
+基于上述观察，我们设计了一个频域 warping 检测器，其流程如下：
+
+\begin{enumerate}[label=步骤 \arabic*：,leftmargin=1.5cm]
+    \item \textbf{生成图像对}：使用已训练的 WaNet 模型，对测试集每张干净图像生成对应的 warped 版本，构造 clean-warped 图像对共 500 组。
+    \item \textbf{FFT 变换}：对每张图像进行二维快速傅里叶变换（FFT），得到频域幅度谱。
+    \item \textbf{特征提取}：从幅度谱中提取 6 维频域特征：高频能量比、频谱熵、均值频率、方差频率、低频能量比和中频能量比。
+    \item \textbf{SVM 分类}：将 500 组 clean-warped 图像对共 1000 个样本按 7:3 划分为训练集和测试集，使用 RBF 核的 SVM 训练二分类器。
+    \item \textbf{ROC 评估}：在测试集上绘制 ROC 曲线，与 STRIP 检测方法进行性能对比。
+\end{enumerate}
+
+\subsection{防御实验}
+
+本文采用三种防御方法验证 WaNet 的防御绕过能力：（1）\textbf{STRIP}\cite{gao2019strip}——通过叠加随机图像观察模型输出熵的扰动来检测后门；（2）\textbf{Fine-Pruning}\cite{liu2018fine}——逐步剪除对干净数据不敏感的神经元，观察后门是否可被消除；（3）\textbf{Neural Cleanse}\cite{wang2019neural}——对每个类别逆向寻找最小触发器，通过异常指数（Anomaly Index）判断是否存在后门。
+
+% ============================================================
+\section{实验设置}
+% ============================================================
+
+\subsection{数据集与模型}
+
+主实验和消融实验均采用 CIFAR-10 数据集（10 类，$32 \times 32$ 彩色图像，训练集 50,000 张，测试集 10,000 张）。防御实验还覆盖了 MNIST 和 GTSRB 数据集（由队友完成）。分类模型为 PreActResNet18\cite{he2016identity}。
+
+\subsection{训练参数}
+
+除消融实验另有说明外，默认训练参数如下：迭代轮数 $N_{\text{iters}} = 400$，批次大小 128，初始学习率 $10^{-2}$，学习率衰减里程碑为 $[80, 160, 240, 320]$，衰减因子 0.1，优化器为 SGD（momentum=0.9, weight\_decay=$5\times10^{-4}$），后门样本比例 $\rho_a = 0.1$，噪声样本比例 $\rho_n = 0.2$，warping 强度 $s = 0.5$，网格大小 $k = 4$，随机种子为 0。
+
+\subsection{评估指标}
+
+\begin{itemize}[leftmargin=1.5cm]
+    \item \textbf{Clean Accuracy}：模型在干净测试集上的分类准确率。
+    \item \textbf{Attack Success Rate (ASR)}：后门样本被分类为目标标签的比例。
+    \item \textbf{Cross Accuracy}：使用随机不同 warping 场生成的噪声样本的正确分类率。
+\end{itemize}
+
+% ============================================================
+\section{实验结果与分析}
+% ============================================================
+
+\subsection{主实验复现结果}
+
+表~\ref{tab:main}展示了 CIFAR-10 上 all-to-one 攻击的复现结果。Clean Accuracy 为 92.84\%，ASR 为 99.15\%，与论文报告的 94.15\% 和 99.55\% 基本一致。
+
+\begin{table}[H]
+\centering
+\caption{CIFAR-10 主实验复现结果}
+\label{tab:main}
+\begin{tabular}{cccc}
+\toprule
+\textbf{指标} & \textbf{复现值} & \textbf{论文参考值} & \textbf{差异} \\
+\midrule
+Clean Accuracy & 92.84\% & 94.15\% & $-$1.31\% \\
+ASR (Backdoor) & 99.15\% & 99.55\% & $-$0.40\% \\
+Cross Accuracy & 89.71\% & 93.55\% & $-$3.84\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{防御绕过验证}
+
+表~\ref{tab:defense}总结了三种防御方法的验证结果。STRIP 的 trojan entropy 分布与 benign entropy 分布高度重叠，无法设定有效阈值区分后门样本；Fine-Pruning 在 clean accuracy 仍保持 90\% 以上时，ASR 仅下降至约 90\%；Neural Cleanse 的 Anomaly Index 在所有标签上均未超过检测阈值 $\tau = 2$。三种防御方法均无法有效检测或消除 WaNet 后门，与论文结论一致。
+
+\begin{table}[H]
+\centering
+\caption{防御实验结果汇总}
+\label{tab:defense}
+\begin{tabular}{ccc}
+\toprule
+\textbf{防御方法} & \textbf{检测/消除结果} & \textbf{是否有效} \\
+\midrule
+STRIP & Entropy 分布不可区分 & 否 \\
+Fine-Pruning & 剪枝后 ASR 仍 $>$ 90\% & 否 \\
+Neural Cleanse & Anomaly Index $<$ 2 & 否 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{消融实验}
+
+\subsubsection{Noise Mode 的影响}
+
+表~\ref{tab:noise}展示了 Noise Mode 消融的结果。关闭 Noise Mode 后，Cross Accuracy 从 89.71\% 骤降至 0.00\%。这表明模型在没有噪声样本约束的情况下，并没有学到真正的 warping 变换，而是利用了插值产生的像素级捷径。这种捷径特征在频域或空间域具有高度规律性，容易被 Neural Cleanse 发现。
+
+\begin{table}[H]
+\centering
+\caption{Noise Mode 消融结果}
+\label{tab:noise}
+\begin{tabular}{cccc}
+\toprule
+\textbf{配置} & \textbf{Clean Acc} & \textbf{ASR} & \textbf{Cross Acc} \\
+\midrule
+With Noise Mode & 92.84\% & 99.15\% & 89.71\% \\
+Without Noise Mode & 92.74\% & 98.21\% & 0.00\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Warping 强度 $s$ 的影响}
+
+表~\ref{tab:s}展示了 $s$ 参数扫描的结果。$s = 0.25$ 时 ASR 仅为 74.12\%，说明 warping 强度过弱时，模型难以捕捉形变模式作为可靠的后门信号。$s$ 增大至 0.50 以上后 ASR 趋于饱和。
+
+\begin{table}[H]
+\centering
+\caption{Warping 强度 $s$ 消融结果（$k=4$）}
+\label{tab:s}
+\begin{tabular}{cccc}
+\toprule
+$s$ & \textbf{Clean Acc} & \textbf{ASR} & \textbf{Cross Acc} \\
+\midrule
+0.25 & 92.39\% & 74.12\% & 89.38\% \\
+0.50 & 92.81\% & 99.59\% & 89.69\% \\
+1.00 & 92.82\% & 98.29\% & 89.30\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{网格大小 $k$ 的影响}
+
+表~\ref{tab:k}展示了 $k$ 参数扫描的结果。$k = 2$ 时 ASR 降至 92.82\%，这是由于控制网格过于粗糙（仅 $2 \times 2 = 4$ 个控制点），形变缺乏足够的空间分辨率，模型倾向于将后门样本视为标签噪声而非可靠的后门信号。
+
+\begin{table}[H]
+\centering
+\caption{网格大小 $k$ 消融结果（$s=0.5$）}
+\label{tab:k}
+\begin{tabular}{cccc}
+\toprule
+$k$ & \textbf{Clean Acc} & \textbf{ASR} & \textbf{Cross Acc} \\
+\midrule
+2 & 92.14\% & 92.82\% & 88.95\% \\
+4 & 92.84\% & 99.15\% & 89.71\% \\
+8 & 91.94\% & 97.55\% & 88.04\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{频域 Warping 检测器}
+
+\subsubsection{FFT 频谱对比}
+
+图~\ref{fig:fft}展示了 Clean 图像与 Warped 图像的 FFT 频谱对比。可以观察到，warped 图像的频谱在高频区域存在可辨识的结构化差异——这是插值平滑操作在频域留下的痕迹。右下角的差异图更直观地展示了这种异常。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{results/freq_detector/fft_spectrum_comparison.png}
+\caption{Clean 图像与 Warped 图像的 FFT 频谱对比。上排：Clean 图像及其频谱；下排：Warped 图像及其频谱；右下角：频谱差异图。}
+\label{fig:fft}
+\end{figure}
+
+\subsubsection{检测性能}
+
+表~\ref{tab:freq}和图~\ref{fig:roc}展示了频域检测器的性能。频域检测器实现了 67.33\% 的检测准确率和 0.735 的 AUC，而 STRIP 的 AUC 约为 0.50（等同随机猜测）。这说明频域特征确实捕捉到了 warping 操作在图像信号层面留下的痕迹，而这种痕迹是 STRIP 等基于模型行为的方法无法捕捉的。
+
+\begin{table}[H]
+\centering
+\caption{频域检测器与 STRIP 性能对比}
+\label{tab:freq}
+\begin{tabular}{ccc}
+\toprule
+\textbf{方法} & \textbf{AUC} & \textbf{准确率} \\
+\midrule
+频域检测器 & 0.735 & 67.33\% \\
+STRIP & $\approx$ 0.50 & 等同随机 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.55\textwidth]{results/freq_detector/roc_curve.png}
+\caption{频域检测器与 STRIP 的 ROC 曲线对比}
+\label{fig:roc}
+\end{figure}
+
+\subsubsection{频域特征分布}
+
+图~\ref{fig:feat}展示了六维频域特征在 clean 和 warped 样本上的分布。从图中可以看出，高频能量比、频谱熵和方差频率等特征在两类样本上存在明显的分布差异，验证了 warping 操作对图像频域的实质性影响。
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{results/freq_detector/feature_distributions.png}
+\caption{六维频域特征在 Clean 和 Warped 样本上的分布。蓝色：Clean；红色：Warped。}
+\label{fig:feat}
+\end{figure}
+
+\subsection{参数敏感性分析}
+
+综合 $s$ 和 $k$ 消融实验的结果可以看出，WaNet 的攻击性能对其核心参数高度敏感。$s < 0.5$ 时 warping 形变过弱，ASR 显著下降；$k < 4$ 时网格分辨率不足，后门信号被模型当作噪声忽略。这一狭窄的有效参数区间表明，WaNet 虽然有效，但并非一个"即插即用"的攻击方案，攻击者需要精心选择 warping 参数。
+
+% ============================================================
+\section{结论}
+% ============================================================
+
+本文围绕 WaNet 后门攻击进行了系统的复现、分析与扩展实验。主要发现如下：
+
+\begin{enumerate}[label=(\arabic*),leftmargin=1.5cm]
+    \item WaNet 在 CIFAR-10 上实现了 99.15\% 的攻击成功率，同时保持 92.84\% 的干净准确率，且能绕过 STRIP、Fine-Pruning 和 Neural Cleanse 三种防御，验证了原论文的结论。
+    \item Noise Mode 是 WaNet 绕过防御的决定性因素——关闭后 Cross Accuracy 降至零，模型学到的是可被检测的像素级捷径而非真正的 warping 变换。
+    \item WaNet 对 warping 参数高度敏感，$s < 0.5$ 或 $k < 4$ 时攻击效果大幅下降，存在一个狭窄的有效参数区间。
+    \item 从频域角度分析了 warping 操作在图像信号层面留下的痕迹，设计并实现了频域 warping 检测器，取得了 AUC 0.735 的检测性能，显著优于 STRIP 的 0.50。
+\end{enumerate}
+
+本文的主要创新在于：不同于现有防御方法（STRIP、Neural Cleanse 等）关注模型行为（输出熵、梯度、神经元激活），我们从图像信号本身的角度出发，利用 warping 操作依赖插值这一特性，在频域中找到了可检测的痕迹。这为检测 warping 类后门攻击提供了一个新的视角。
+
+\section*{致谢}
+
+感谢队友周争妍完成主实验复现、环境配置和防御实验，为消融分析和频域检测器的设计提供了坚实的基础。实验在 NVIDIA RTX 3090 GPU 上完成，感谢 AutoDL 平台提供的算力支持。
+
+% ============================================================
+\section{成员贡献}
+% ============================================================
+
+\noindent\textbf{周争妍}：（1）完成论文选读与资料整理；（2）配置本地 Conda/GPU 实验环境，修复官方代码在当前 PyTorch 版本中的兼容性问题；（3）编写 tmux 后台运行脚本，实现 GPU0/GPU1 并行执行实验任务；（4）完成 MNIST、CIFAR-10、GTSRB 三个数据集上 all-to-one 和 all-to-all 共六组主实验；（5）完成 STRIP、Fine-Pruning、Neural Cleanse 三种防御实验，整理防御结果数据；（6）撰写主实验复现报告。
+
+\noindent\textbf{蒋竺君}：（1）设计并完成 Noise Mode、warping 强度 $s$、网格大小 $k$ 和随机种子的消融实验（共 10 组训练任务）；（2）提出基于频域特征的 warping 后门检测方案，完成频域特征提取、SVM 分类器训练和 ROC 评估；（3）完成 warping field 可视化、FFT 频谱对比、PSNR/SSIM 感知分析和消融实验汇总图等可视化工作；（4）设计并实现交互式 Web 演示平台（Dashboard）；（5）撰写本文的实验结果、消融分析和频域检测器部分；（6）制作答辩 PPT 并撰写答辩稿。
+
+\vspace{1cm}
+\noindent 所有代码与实验数据已开源：\url{https://github.com/axgo-ja/NIS3353}。
+
+% ============================================================
+\begin{thebibliography}{99}
+
+\bibitem{nguyen2021wanet}
+T.~A.~Nguyen and A.~T.~Tran,
+``WaNet -- Imperceptible Warping-based Backdoor Attack,''
+in \emph{International Conference on Learning Representations (ICLR)}, 2021.
+
+\bibitem{gu2017badnets}
+T.~Gu, B.~Dolan-Gavitt, and S.~Garg,
+``BadNets: Identifying Vulnerabilities in the Machine Learning Model Supply Chain,''
+in \emph{arXiv preprint arXiv:1708.06733}, 2017.
+
+\bibitem{chen2017targeted}
+X.~Chen, C.~Liu, B.~Li, K.~Lu, and D.~Song,
+``Targeted Backdoor Attacks on Deep Learning Systems Using Data Poisoning,''
+in \emph{arXiv preprint arXiv:1712.05526}, 2017.
+
+\bibitem{liu2018trojaning}
+Y.~Liu, S.~Ma, Y.~Aafer, W.-C.~Lee, J.~Zhai, W.~Wang, and X.~Zhang,
+``Trojaning Attack on Neural Networks,''
+in \emph{NDSS}, 2018.
+
+\bibitem{barni2019new}
+M.~Barni, K.~Kallas, and B.~Tondi,
+``A New Backdoor Attack in CNNs by Training Set Corruption Without Label Poisoning,''
+in \emph{IEEE ICIP}, 2019.
+
+\bibitem{gao2019strip}
+Y.~Gao, C.~Xu, D.~Wang, S.~Chen, D.~C.~Ranasinghe, and S.~Nepal,
+``STRIP: A Defence Against Trojan Attacks on Deep Neural Networks,''
+in \emph{ACSAC}, 2019.
+
+\bibitem{liu2018fine}
+K.~Liu, B.~Dolan-Gavitt, and S.~Garg,
+``Fine-Pruning: Defending Against Backdooring Attacks on Deep Neural Networks,''
+in \emph{RAID}, 2018.
+
+\bibitem{wang2019neural}
+B.~Wang, Y.~Yao, S.~Shan, H.~Li, B.~Viswanath, H.~Zheng, and B.~Y.~Zhao,
+``Neural Cleanse: Identifying and Mitigating Backdoor Attacks in Neural Networks,''
+in \emph{IEEE S\&P}, 2019.
+
+\bibitem{he2016identity}
+K.~He, X.~Zhang, S.~Ren, and J.~Sun,
+``Identity Mappings in Deep Residual Networks,''
+in \emph{ECCV}, 2016.
+
+\end{thebibliography}
+
+\end{document}
