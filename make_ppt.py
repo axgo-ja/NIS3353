@@ -55,7 +55,7 @@ def title_slide(title, subtitle, authors):
     tb(s,Inches(3),Inches(4.5),Inches(7.333),Inches(0.5),authors,16,ROSE,a=PP_ALIGN.CENTER)
     line(s,Inches(3),Inches(5.4),Inches(7.333))
 
-OUT=os.path.join(os.path.dirname(os.path.abspath(__file__)),'WaNet答辩_v2.pptx')
+OUT=os.path.join(os.path.dirname(os.path.abspath(__file__)),'WaNet答辩_v3.pptx')
 
 # === SLIDE 1: Cover ===
 title_slide("Warping后门攻击的频域弱点",
@@ -159,19 +159,19 @@ s=prs.slides.add_slide(prs.slide_layouts[6]); bg(s)
 tb(s,Inches(0.8),Inches(0.5),Inches(7),Inches(0.5),"核心洞察: Warping在频域留下痕迹",30,TXT,True)
 line(s,Inches(0.8),Inches(1.1),Inches(1.5))
 mtb(s,Inches(0.8),Inches(1.6),Inches(5.5),Inches(3.0),[
-    ("消融实验揭示了一个重要线索:",False,MUTED),
-    ("WaNet 的 warping 到底是怎么实现的？",False,TXT),
-    ("它调用的是 PyTorch 的 grid_sample 函数 + 双线性插值 (bilinear interpolation)",True,ROSE),
+    ("消融实验给了我们一个启发:",False,MUTED),
     ("",False,MUTED),
-    ("而插值运算本质上是一种信号处理操作 ——",False,MUTED),
-    ("每个新像素 = 周围像素的加权平均 -> 必然在频域留下痕迹!",True,TXT),
+    ("Warping 是怎么让图像变形的？靠的是插值 ——",False,TXT),
+    ("把像素挪到新位置后，用周围像素的加权平均来填颜色",True,ROSE),
     ("",False,MUTED),
-    ("全新检测思路:",False,MUTED),
+    ("而插值 = 信号处理中的平滑操作",False,MUTED),
+    ("平滑会改变图像频域中的高频分量 -> 留下可检测的痕迹!",True,TXT),
+    ("",False,MUTED),
     ("现有防御: 看模型输出 -> 检测不到WaNet",False,RED),
     ("我们的方法: 看图像频域(FFT) -> 能检测到!",True,GRN),
 ],17)
 tb(s,Inches(7.5),Inches(2.0),Inches(5),Inches(3.0),
-   "Warping的本质\n\ngrid_sample对图像\n做双线性插值\n\n每个插值点=周围像素\n的加权平均\n\n-> 频域高频分量异常",
+   "为什么插值会留痕？\n\n图像变形后的每个新像素\n= 周围像素的加权平均\n\n加权平均 = 平滑操作\n平滑 = 高频分量改变\n\n-> 频域频谱出现异常",
    16,ROSE,a=PP_ALIGN.CENTER)
 line(s,Inches(0.8),Inches(5.5),Inches(11.7))
 tb(s,Inches(0.8),Inches(5.8),Inches(11.7),Inches(0.5),"不可感知 != 不可检测",18,ROSE,True,PP_ALIGN.CENTER)
