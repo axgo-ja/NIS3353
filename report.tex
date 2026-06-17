@@ -1,5 +1,8 @@
 \documentclass[12pt,a4paper]{ctexart}
 
+% !TeX program = XeLaTeX
+% 必须在 Overleaf 菜单中选 XeLaTeX 编译器, 否则中文无法显示
+
 % === Packages ===
 \usepackage[top=2.5cm,bottom=2.5cm,left=2.8cm,right=2.8cm]{geometry}
 \usepackage{graphicx}
@@ -7,7 +10,6 @@
 \usepackage{amsmath,amssymb}
 \usepackage{hyperref}
 \usepackage{caption}
-\usepackage{subcaption}
 \usepackage{float}
 \usepackage{multirow}
 \usepackage{enumitem}
@@ -245,7 +247,7 @@ $k$ & \textbf{Clean Acc} & \textbf{ASR} & \textbf{Cross Acc} \\
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.85\textwidth]{results/freq_detector/fft_spectrum_comparison.png}
+\includegraphics[width=0.85\textwidth]{fft_spectrum_comparison.png}
 \caption{Clean 图像与 Warped 图像的 FFT 频谱对比。上排：Clean 图像及其频谱；下排：Warped 图像及其频谱；右下角：频谱差异图。}
 \label{fig:fft}
 \end{figure}
@@ -270,7 +272,7 @@ STRIP & $\approx$ 0.50 & 等同随机 \\
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.55\textwidth]{results/freq_detector/roc_curve.png}
+\includegraphics[width=0.55\textwidth]{roc_curve.png}
 \caption{频域检测器与 STRIP 的 ROC 曲线对比}
 \label{fig:roc}
 \end{figure}
@@ -281,7 +283,7 @@ STRIP & $\approx$ 0.50 & 等同随机 \\
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{results/freq_detector/feature_distributions.png}
+\includegraphics[width=\textwidth]{feature_distributions.png}
 \caption{六维频域特征在 Clean 和 Warped 样本上的分布。蓝色：Clean；红色：Warped。}
 \label{fig:feat}
 \end{figure}
